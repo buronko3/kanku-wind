@@ -2,48 +2,79 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>関空島 風速（参考）</title>
 </head>
-
-<body style="text-align:center; font-family:sans-serif;">
+<body style="text-align:center; font-family:sans-serif; margin-top:8vh;">
   <h2>関空島の現在の風速（参考）</h2>
 
-  <div id="wind" style="font-size:48px;">読込中…</div>
-  <div id="time"></div>
+  <div id="wind" style="font-size:56px; font-weight:bold;">読込中…</div>
+  <div id="time" style="font-size:20px; margin-top:16px;"></div>
+  <div id="debug" style="font-size:14px; margin-top:24px; color:#666;"></div>
 
   <script>
-    async function updateWind() {
-
-      // ① 最新の観測時刻を取得
-      const latestTimeText = await fetch(
-        "https://www.jma.go.jp/bosai/amedas/data/latest_time.txt"
-      ).then(r => r.text());
-
-      // 2026-04-27T09:50:00+09:00 → 20260427095000
-      const timestamp = latestTimeText
-        .replace(/[-:T+]/g, "")
-        .slice(0, 14);
-
-      // ② 最新JSON取得
-      const json = await fetch(
-        "https://www.jma.go.jp/bosai/amedas/data/map/" + timestamp + ".json"
-      ).then(r => r.json());
-
-      // ③ 関空島（観測点コード：62101）の風速
-      const windSpeed = json["62101"].wind[0];
-
-      // ④ 表示
-      document.getElementById("wind").textContent = windSpeed + " m/s";
-      document.getElementById("time").textContent =
-        "観測時刻：" + latestTimeText;
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
     }
 
-    // 初回実行＋5分ごとに更新
+    function requestText(url, onSuccess, onError) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onSuccess(xhr.responseText);
+          } else {
+            onError('HTTP ' + xhr.status + ' : ' + url);
+          }
+        }
+      };
+      xhr.onerror = function () {
+        onError('通信エラー : ' + url);
+      };
+      xhr.send(null);
+    }
+
+    function updateWind() {
+      setText('debug', '更新確認中…');
+
+      requestText('https://www.jma.go.jp/bosai/amedas/data/latest_time.txt', function (latestTimeText) {
+        latestTimeText = latestTimeText.replace(/\s+/g, '');
+        var timestamp = latestTimeText.replace(/[-:T+]/g, '').slice(0, 14);
+        var jsonUrl = 'https://www.jma.go.jp/bosai/amedas/data/map/' + timestamp + '.json';
+
+        requestText(jsonUrl, function (jsonText) {
+          try {
+            var json = JSON.parse(jsonText);
+            if (!json['62101'] || !json['62101'].wind) {
+              throw new Error('観測点62101のwindデータが見つかりません');
+            }
+            var windSpeed = json['62101'].wind[0];
+            setText('wind', windSpeed + ' m/s');
+            setText('time', '観測時刻：' + latestTimeText);
+            setText('debug', '最終更新：' + new Date().toLocaleString('ja-JP'));
+          } catch (e) {
+            setText('wind', '取得失敗');
+            setText('debug', 'JSON処理エラー：' + e.message);
+          }
+        }, function (message) {
+          setText('wind', '取得失敗');
+          setText('debug', message);
+        });
+      }, function (message) {
+        setText('wind', '取得失敗');
+        setText('debug', message);
+      });
+    }
+
     updateWind();
     setInterval(updateWind, 5 * 60 * 1000);
   </script>
 
-  <p style="font-size:12px;">
+  <p style="font-size:12px; margin-top:32px;">
     ※気象庁アメダス公開データを基にした参考表示
   </p>
 </body>
