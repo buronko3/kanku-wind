@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>関空島 風速（参考）</title>
+</head>
+
+<body style="text-align:center; font-family:sans-serif;">
+  <h2>関空島の現在の風速（参考）</h2>
+
+  <div id="wind" style="font-size:48px;">読込中…</div>
+  <div id="time"></div>
+
+  <script>
+    async function updateWind() {
+
+      // ① 最新の観測時刻を取得
+      const latestTimeText = await fetch(
+        "https://www.jma.go.jp/bosai/amedas/data/latest_time.txt"
+      ).then(r => r.text());
+
+      // 2026-04-27T09:50:00+09:00 → 20260427095000
+      const timestamp = latestTimeText
+        .replace(/[-:T+]/g, "")
+        .slice(0, 14);
+
+      // ② 最新JSON取得
+      const json = await fetch(
+        "https://www.jma.go.jp/bosai/amedas/data/map/" + timestamp + ".json"
+      ).then(r => r.json());
+
+      // ③ 関空島（観測点コード：62101）の風速
+      const windSpeed = json["62101"].wind[0];
+
+      // ④ 表示
+      document.getElementById("wind").textContent = windSpeed + " m/s";
+      document.getElementById("time").textContent =
+        "観測時刻：" + latestTimeText;
+    }
+
+    // 初回実行＋5分ごとに更新
+    updateWind();
+    setInterval(updateWind, 5 * 60 * 1000);
+  </script>
+
+  <p style="font-size:12px;">
+    ※気象庁アメダス公開データを基にした参考表示
+  </p>
+</body>
+</html>
